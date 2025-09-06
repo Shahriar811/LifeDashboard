@@ -1,23 +1,33 @@
 package com.example.lifedashboard.ui.viewmodels
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.lifedashboard.data.Expense
-import com.example.lifedashboard.data.ExpenseDao
-import com.example.lifedashboard.data.Goal
-import com.example.lifedashboard.data.GoalDao
-import com.example.lifedashboard.data.Note
-import com.example.lifedashboard.data.NoteDao
-import com.example.lifedashboard.data.Task
-import com.example.lifedashboard.data.TaskDao
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
+import com.example.lifedashboard.TaskNotificationScheduler
+import com.example.lifedashboard.data.*
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-class TaskViewModel(private val taskDao: TaskDao) : ViewModel() {
-    val allTasks: StateFlow<List<Task>> = taskDao.getAllTasks()
+// This class definition fixes the "Unresolved reference" error
+class TaskViewModel(application: Application, private val taskDao: TaskDao) : AndroidViewModel(application) {
+    private val scheduler = TaskNotificationScheduler(application)
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery = _searchQuery.asStateFlow()
+
+    val allTasks: StateFlow<List<Task>> = _searchQuery
+        .flatMapLatest { query ->
+            if (query.isBlank()) {
+                taskDao.getAllTasks()
+            } else {
+                taskDao.getTasksFiltered("%$query%")
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun onSearchQueryChange(query: String) {
+        _searchQuery.value = query
+    }
 
     fun insertTask(text: String) = viewModelScope.launch {
         taskDao.insertTask(Task(text = text))
@@ -25,14 +35,20 @@ class TaskViewModel(private val taskDao: TaskDao) : ViewModel() {
 
     fun updateTask(task: Task) = viewModelScope.launch {
         taskDao.updateTask(task)
+        if (task.dueDate != null && !task.isCompleted) {
+            scheduler.schedule(task)
+        } else {
+            scheduler.cancel(task)
+        }
     }
 
     fun deleteTask(task: Task) = viewModelScope.launch {
+        scheduler.cancel(task)
         taskDao.deleteTask(task)
     }
 }
 
-class ExpenseViewModel(private val expenseDao: ExpenseDao) : ViewModel() {
+class ExpenseViewModel(private val expenseDao: ExpenseDao) : AndroidViewModel(Application()) {
     val allExpenses: StateFlow<List<Expense>> = expenseDao.getAllExpenses()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -45,7 +61,7 @@ class ExpenseViewModel(private val expenseDao: ExpenseDao) : ViewModel() {
     }
 }
 
-class NoteViewModel(private val noteDao: NoteDao) : ViewModel() {
+class NoteViewModel(private val noteDao: NoteDao) : AndroidViewModel(Application()) {
     val allNotes: StateFlow<List<Note>> = noteDao.getAllNotes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -58,7 +74,7 @@ class NoteViewModel(private val noteDao: NoteDao) : ViewModel() {
     }
 }
 
-class GoalsViewModel(private val goalDao: GoalDao) : ViewModel() {
+class GoalsViewModel(private val goalDao: GoalDao) : AndroidViewModel(Application()) {
     val allGoals: StateFlow<List<Goal>> = goalDao.getAllGoals()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

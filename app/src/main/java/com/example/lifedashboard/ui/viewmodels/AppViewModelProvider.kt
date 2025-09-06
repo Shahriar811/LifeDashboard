@@ -8,34 +8,35 @@ import com.example.lifedashboard.MainApplication
 
 object AppViewModelProvider {
     val Factory = viewModelFactory {
-        // Initializer for TaskViewModel
         initializer {
             TaskViewModel(
-                (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as MainApplication).database.taskDao()
+                mainApplication(),
+                mainApplication().database.taskDao()
             )
         }
-        // Initializer for ExpenseViewModel
         initializer {
             ExpenseViewModel(
-                (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as MainApplication).database.expenseDao()
+                mainApplication().database.expenseDao()
             )
         }
-        // Initializer for NoteViewModel
         initializer {
             NoteViewModel(
-                (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as MainApplication).database.noteDao()
+                mainApplication().database.noteDao()
             )
         }
-        // Initializer for GoalsViewModel - THIS IS THE CORRECTED LINE
         initializer {
             GoalsViewModel(
-                (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as MainApplication).database.goalDao()
+                mainApplication().database.goalDao()
+            )
+        }
+        initializer {
+            SettingsViewModel(
+                mainApplication().userPreferencesRepository,
+                mainApplication().database
             )
         }
     }
 }
 
-// A helper function to easily get a reference to the Application instance
 fun CreationExtras.mainApplication(): MainApplication =
     (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as MainApplication)
-

@@ -16,6 +16,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.lifedashboard.data.Goal
 import com.example.lifedashboard.ui.viewmodels.AppViewModelProvider
 import com.example.lifedashboard.ui.viewmodels.GoalsViewModel
+import com.example.lifedashboard.ui.viewmodels.SettingsViewModel
 import kotlinx.coroutines.delay
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -32,8 +33,9 @@ fun GoalsScreen(
         .toSortedMap(compareBy { goalType ->
             when (goalType) {
                 "Daily" -> 0
-                "Monthly" -> 1
-                else -> 2
+                "Weekly" -> 1
+                "Monthly" -> 2
+                else -> 3
             }
         })
 
@@ -120,7 +122,6 @@ fun GoalItem(goal: Goal, onDelete: (Goal) -> Unit) {
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                // Countdown Timer Display
                 GoalTimer(goal = goal)
             }
             IconButton(onClick = { onDelete(goal) }) {
@@ -135,27 +136,45 @@ fun GoalItem(goal: Goal, onDelete: (Goal) -> Unit) {
 }
 
 @Composable
-fun GoalTimer(goal: Goal) {
+fun GoalTimer(goal: Goal, settingsViewModel: SettingsViewModel = viewModel(factory = AppViewModelProvider.Factory)) {
     var timeLeft by remember { mutableStateOf("") }
+    val weekStartDay by settingsViewModel.weekStartDay.collectAsState()
 
-    LaunchedEffect(key1 = goal) {
+    LaunchedEffect(key1 = goal, key2 = weekStartDay) {
         while (true) {
             val now = Calendar.getInstance()
             val goalCalendar = Calendar.getInstance().apply { timeInMillis = goal.creationDate }
 
+            val firstDayOfWeek = when (weekStartDay) {
+                "Sunday" -> Calendar.SUNDAY
+                "Monday" -> Calendar.MONDAY
+                else -> Calendar.SATURDAY
+            }
+            goalCalendar.firstDayOfWeek = firstDayOfWeek
+
+
             val endOfPeriod = when (goal.type) {
                 "Daily" -> (goalCalendar.clone() as Calendar).apply {
-                    set(Calendar.HOUR_OF_DAY, 23)
-                    set(Calendar.MINUTE, 59)
-                    set(Calendar.SECOND, 59)
+                    add(Calendar.DATE, 1)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                }
+                "Weekly" -> (goalCalendar.clone() as Calendar).apply {
+                    set(Calendar.DAY_OF_WEEK, firstDayOfWeek)
+                    add(Calendar.DATE, 7)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
                 }
                 "Monthly" -> (goalCalendar.clone() as Calendar).apply {
-                    set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH))
-                    set(Calendar.HOUR_OF_DAY, 23)
-                    set(Calendar.MINUTE, 59)
-                    set(Calendar.SECOND, 59)
+                    add(Calendar.MONTH, 1)
+                    set(Calendar.DAY_OF_MONTH, 1)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
                 }
-                else -> now // Should not happen
+                else -> now
             }
 
             val diff = endOfPeriod.timeInMillis - now.timeInMillis
@@ -165,7 +184,7 @@ fun GoalTimer(goal: Goal) {
                     val hours = TimeUnit.MILLISECONDS.toHours(diff)
                     val minutes = TimeUnit.MILLISECONDS.toMinutes(diff) % 60
                     "${hours}h ${minutes}m left"
-                } else { // Monthly
+                } else { // Weekly or Monthly
                     val days = TimeUnit.MILLISECONDS.toDays(diff)
                     if (days > 0) "${days}d left" else "Last day!"
                 }
@@ -194,8 +213,7 @@ fun AddGoalDialog(
 ) {
     var text by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
-    // Updated list of goal types
-    val goalTypes = listOf("Daily", "Monthly")
+    val goalTypes = listOf("Daily", "Weekly", "Monthly")
     var selectedType by remember { mutableStateOf(goalTypes[0]) }
 
     AlertDialog(

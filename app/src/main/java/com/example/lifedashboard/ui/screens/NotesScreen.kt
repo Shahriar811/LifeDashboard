@@ -79,7 +79,11 @@ fun NoteItem(note: Note, onDelete: (Note) -> Unit) {
                 )
             }
             IconButton(onClick = { onDelete(note) }) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete Note")
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Delete Note",
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
         }
     }

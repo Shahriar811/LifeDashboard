@@ -17,6 +17,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.lifedashboard.data.Expense
 import com.example.lifedashboard.ui.viewmodels.AppViewModelProvider
 import com.example.lifedashboard.ui.viewmodels.ExpenseViewModel
+import com.example.lifedashboard.ui.viewmodels.SettingsViewModel
+import java.text.DecimalFormat
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -24,10 +26,13 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpensesScreen(
-    expenseViewModel: ExpenseViewModel = viewModel(factory = AppViewModelProvider.Factory)
+    expenseViewModel: ExpenseViewModel = viewModel(factory = AppViewModelProvider.Factory),
+    settingsViewModel: SettingsViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     val expenses by expenseViewModel.allExpenses.collectAsState()
+    val currencySymbol by settingsViewModel.currencySymbol.collectAsState()
+
 
     Scaffold(
         floatingActionButton = {
@@ -50,13 +55,14 @@ fun ExpensesScreen(
                 modifier = Modifier.padding(top = 8.dp)
             ) {
                 items(expenses, key = { it.id }) { expense ->
-                    ExpenseItem(expense = expense, onDelete = { expenseViewModel.deleteExpense(it) })
+                    ExpenseItem(expense = expense, currencySymbol = currencySymbol, onDelete = { expenseViewModel.deleteExpense(it) })
                 }
             }
         }
 
         if (showAddDialog) {
             AddExpenseDialog(
+                currencySymbol = currencySymbol,
                 onDismiss = { showAddDialog = false },
                 onAdd = { description, amount, category ->
                     expenseViewModel.insertExpense(description, amount, category)
@@ -68,10 +74,12 @@ fun ExpensesScreen(
 }
 
 @Composable
-fun ExpenseItem(expense: Expense, onDelete: (Expense) -> Unit) {
-    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "BD")).apply{
+fun ExpenseItem(expense: Expense, currencySymbol: String, onDelete: (Expense) -> Unit) {
+    val currencyFormat = (NumberFormat.getCurrencyInstance() as DecimalFormat).apply {
         maximumFractionDigits = 2
-        currency = Currency.getInstance("BDT")
+        val symbols = this.decimalFormatSymbols
+        symbols.currencySymbol = currencySymbol
+        this.decimalFormatSymbols = symbols
     }
 
     val dateFormat = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
@@ -90,14 +98,22 @@ fun ExpenseItem(expense: Expense, onDelete: (Expense) -> Unit) {
             }
             Text(currencyFormat.format(expense.amount), style = MaterialTheme.typography.bodyLarge)
             IconButton(onClick = { onDelete(expense) }) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete Expense")
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Delete Expense",
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
         }
     }
 }
 
 @Composable
-fun AddExpenseDialog(onDismiss: () -> Unit, onAdd: (String, Double, String) -> Unit) {
+fun AddExpenseDialog(
+    currencySymbol: String,
+    onDismiss: () -> Unit,
+    onAdd: (String, Double, String) -> Unit
+) {
     var description by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
@@ -111,7 +127,7 @@ fun AddExpenseDialog(onDismiss: () -> Unit, onAdd: (String, Double, String) -> U
                 OutlinedTextField(
                     value = amount,
                     onValueChange = { amount = it },
-                    label = { Text("Amount (BDT)") },
+                    label = { Text("Amount ($currencySymbol)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
                 OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("Category (e.g., Food)") })

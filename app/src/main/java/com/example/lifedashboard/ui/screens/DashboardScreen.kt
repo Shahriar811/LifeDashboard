@@ -7,28 +7,33 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.lifedashboard.ui.viewmodels.AppViewModelProvider
-import com.example.lifedashboard.ui.viewmodels.ExpenseViewModel
-import com.example.lifedashboard.ui.viewmodels.GoalsViewModel
-import com.example.lifedashboard.ui.viewmodels.TaskViewModel
+import co.yml.charts.common.model.PlotType
+import co.yml.charts.ui.piechart.charts.PieChart
+import co.yml.charts.ui.piechart.models.PieChartConfig
+import co.yml.charts.ui.piechart.models.PieChartData
+import com.example.lifedashboard.ui.viewmodels.*
+import java.text.DecimalFormat
 import java.text.NumberFormat
-import java.util.Calendar
-import java.util.Currency
-import java.util.Locale
+import java.util.*
 
 @Composable
 fun DashboardScreen(
     taskViewModel: TaskViewModel = viewModel(factory = AppViewModelProvider.Factory),
     expenseViewModel: ExpenseViewModel = viewModel(factory = AppViewModelProvider.Factory),
-    goalsViewModel: GoalsViewModel = viewModel(factory = AppViewModelProvider.Factory)
+    goalsViewModel: GoalsViewModel = viewModel(factory = AppViewModelProvider.Factory),
+    settingsViewModel: SettingsViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val tasks by taskViewModel.allTasks.collectAsState()
     val expenses by expenseViewModel.allExpenses.collectAsState()
     val goals by goalsViewModel.allGoals.collectAsState()
+    val currencySymbol by settingsViewModel.currencySymbol.collectAsState()
 
     val pendingTasks = tasks.count { !it.isCompleted }
 
@@ -41,10 +46,36 @@ fun DashboardScreen(
                 today.get(Calendar.DAY_OF_YEAR) == expenseDate.get(Calendar.DAY_OF_YEAR)
     }.sumOf { it.amount }
 
-    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("en", "BD")).apply {
+    val currencyFormat = (NumberFormat.getCurrencyInstance() as DecimalFormat).apply {
         maximumFractionDigits = 2
-        currency = Currency.getInstance("BDT")
+        val symbols = this.decimalFormatSymbols
+        symbols.currencySymbol = currencySymbol
+        this.decimalFormatSymbols = symbols
     }
+
+    val expenseByCategory = expenses
+        .groupBy { it.category }
+        .mapValues { entry -> entry.value.sumOf { it.amount } }
+
+    val pieChartData = PieChartData(
+        slices = expenseByCategory.map { (category, sum) ->
+            PieChartData.Slice(
+                label = category,
+                value = sum.toFloat(),
+                color = Color((0..255).random(), (0..255).random(), (0..255).random())
+            )
+        },
+        plotType = PlotType.Pie
+    )
+
+    val pieChartConfig = PieChartConfig(
+        isAnimationEnable = true,
+        showSliceLabels = true,
+        sliceLabelTextSize = 12.sp,
+        sliceLabelTextColor = Color.White,
+        backgroundColor = MaterialTheme.colorScheme.surface
+    )
+
 
     Column(
         modifier = Modifier
@@ -75,6 +106,32 @@ fun DashboardScreen(
                 SummaryRow("Spent Today:", currencyFormat.format(todaysExpenses))
             }
         }
+
+        if (pieChartData.slices.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "Expense Breakdown",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    PieChart(
+                        modifier = Modifier
+                            .fillMaxWidth(0.8f)
+                            .aspectRatio(1f)
+                            .padding(16.dp),
+                        pieChartData = pieChartData,
+                        pieChartConfig = pieChartConfig
+                    )
+                }
+            }
+        }
+
 
         Card(
             modifier = Modifier.fillMaxWidth(),

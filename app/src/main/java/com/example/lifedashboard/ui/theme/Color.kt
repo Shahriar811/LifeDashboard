@@ -7,8 +7,9 @@ val DarkGreen = Color(0xFF2C3333)
 val Teal = Color(0xFF395B64)
 val PowderBlue = Color(0xFFA5C9CA)
 val MintCream = Color(0xFFE7F6F2)
+val NightBackground = Color(0xFF222831)
+
 
 // Additional standard colors
 val White = Color.White
 val ErrorRed = Color(0xFFB00020)
-

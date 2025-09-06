@@ -16,7 +16,7 @@ private val DarkColorScheme = darkColorScheme(
     primary = PowderBlue,
     secondary = Teal,
     tertiary = MintCream,
-    background = DarkGreen,
+    background = NightBackground,
     surface = Color(0xFF3A4040), // A slightly lighter shade for cards in dark mode
     onPrimary = DarkGreen,
     onSecondary = MintCream,
@@ -66,4 +66,3 @@ fun LifeDashboardTheme(
         content = content
     )
 }
-
